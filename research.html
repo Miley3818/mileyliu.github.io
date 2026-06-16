@@ -44,13 +44,14 @@
 
             <div class="research-card reveal" data-delay="100">
                 <h3><a href="Where_Prompting_Hits_the_Wall.pdf" target="_blank">Where Prompting Hits the Wall: Diagnosing Category Boundary Complexity in LLM-Based Classification</a></h3>
-                <p class="authors">with Xinming Gao and Ge Shi (<a href="https://geshijoker.github.io/" target="_blank">website</a>)</p>
+                <p class="authors">with Xinming Gao and Ge Shi (<a href="https://scholar.google.com/citations?user=44UCIuEAAAAJ&hl=en" target="_blank">Google Scholar</a>)</p>
                 <details>
                     <summary>Abstract</summary>
                     <p class="abstract-text">
                         Practitioners deploying large language models for classification face a recurring question with no principled answer: when does further prompt engineering stop paying off, and when should one switch to stronger models, supervised training, or human review? We argue that the <em>escalation behavior</em> of a staged classification system&mdash;how often weaker models disagree and trigger expert or human resolution&mdash;is itself a diagnostic signal for this decision. We instantiate this view in PoliPrompt, a framework combining rule-augmented few-shot prompting (RAFS) with a heterogeneous model cascade that produces two operational signals: Expert Call Rate (ECR) and human-in-the-loop (HITL) rate. Across seven text and multimodal datasets, ECR is strongly negatively associated with Macro F1, and 0-shot ECR provides the cleanest rank-ordering of prompting difficulty (Spearman &minus;0.89). This signal supports a three-regime mapping&mdash;<em>near-ceiling</em>, <em>prompt-recoverable</em>, and <em>prompting-limited</em>&mdash;each implying a different next-step decision. PoliPrompt remains competitive with a GPT-4o single-call baseline on operationalizable tasks and underperforms it mainly on prompting-limited tasks, where high escalation and low F1 indicate that prompting alone is unlikely to suffice. We position PoliPrompt not as a universal replacement for stronger models, but as a diagnostic workflow that tells practitioners when prompting is sufficient, when it is recoverable through structured prompting, and when it has likely hit the wall.
                     </p>
                 </details>
+                <a href="https://github.com/rail-ai-lab/poliprompt" target="_blank" class="extra-link">GitHub &rarr;</a>
             </div>
 
             <div class="research-card reveal" data-delay="200">
