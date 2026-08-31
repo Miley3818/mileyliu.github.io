@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PoliBench — Political Guardrail & Jailbreak-Robustness Benchmark for LLMs</title>
+<meta name="description" content="A benchmark evaluating how large language models handle political / authoritarian-harm requests and how robust those safeguards are to adversarial evasion." />
+<!-- social preview: replace og.png with a 1200x630 image in /assets to get a rich share card -->
+<meta property="og:title" content="PoliBench — Political Guardrail & Jailbreak-Robustness Benchmark" />
+<meta property="og:description" content="The strictest LLMs are the easiest to break. An interactive benchmark of political guardrails and their robustness to adversarial evasion." />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="assets/og.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2316181d'/%3E%3Ccircle cx='23' cy='9' r='3.6' fill='%232a9d3f'/%3E%3Ccircle cx='23' cy='23' r='3.6' fill='%23D55E00'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;450;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<style>
+  :root{
+    --us:#2f74c0; --cn:#e0703a; --open:#8a929b;
+    --good:#2a9d3f; --bad:#c1352b;
+    --bg:#fbfcfe; --surface:#ffffff; --ink:#14171c; --mut:#5b6673;
+    --line:#e7eaef; --soft:#f3f6f9; --accent:#2f74c0; --shadow:0 1px 2px rgba(20,30,50,.04),0 8px 28px rgba(20,30,50,.06);
+  }
+  html[data-theme="dark"]{
+    --bg:#0d1016; --surface:#151a22; --ink:#e9ecf1; --mut:#98a2b0;
+    --line:#242c37; --soft:#171d26; --accent:#63a4e6; --us:#5a9be6; --cn:#f0895a; --open:#9aa4b2;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+       line-height:1.6;-webkit-font-smoothing:antialiased;font-feature-settings:"cv02","cv03","cv11";
+       transition:background .3s,color .3s}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 22px}
+  .serif{font-family:"Fraunces",Georgia,serif}
+  a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+  .mut{color:var(--mut)} .small{font-size:13.5px}
+  /* ---- top nav ---- */
+  nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);
+      background:color-mix(in srgb,var(--bg) 82%,transparent);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;align-items:center;gap:18px;height:56px}
+  .mark{font-family:"Fraunces";font-weight:600;font-size:19px;letter-spacing:-.01em;display:flex;align-items:center;gap:9px}
+  .mark .dots{display:inline-block;width:22px;height:22px;border-radius:6px;background:var(--ink);position:relative}
+  .mark .dots::before,.mark .dots::after{content:"";position:absolute;width:6px;height:6px;border-radius:50%}
+  .mark .dots::before{background:var(--good);top:4px;right:4px}
+  .mark .dots::after{background:var(--cn);bottom:4px;right:4px}
+  nav .grow{flex:1}
+  nav a.navlink{color:var(--mut);font-size:14px;font-weight:500;margin-left:18px}
+  nav a.navlink:hover{color:var(--ink);text-decoration:none}
+  .themebtn{cursor:pointer;border:1px solid var(--line);background:var(--surface);border-radius:9px;
+            width:34px;height:34px;font-size:15px;line-height:1;color:var(--ink)}
+  @media(max-width:680px){nav a.navlink{display:none}}
+  /* ---- hero ---- */
+  .hero{padding:70px 0 44px}
+  .chip{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+        color:var(--cn);background:color-mix(in srgb,var(--cn) 12%,transparent);padding:4px 11px;border-radius:999px}
+  h1{font-family:"Fraunces";font-weight:600;font-size:clamp(38px,6.2vw,66px);line-height:1.03;
+     letter-spacing:-.025em;margin:18px 0 0}
+  h1 em{font-style:italic;color:var(--cn)}
+  .lede{font-size:clamp(17px,2.2vw,20px);color:var(--mut);max-width:660px;margin:20px 0 0}
+  .stats{display:flex;gap:26px;margin:28px 0 4px;flex-wrap:wrap}
+  .stat b{font-family:"Fraunces";font-weight:600;font-size:30px;display:block;line-height:1}
+  .stat span{font-size:13px;color:var(--mut)}
+  .cta{margin-top:26px;display:flex;gap:12px;flex-wrap:wrap}
+  .btn{font-weight:600;font-size:14.5px;padding:11px 18px;border-radius:11px;border:1px solid var(--line);
+       background:var(--surface);color:var(--ink);cursor:pointer;box-shadow:var(--shadow)}
+  .btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  /* ---- sections ---- */
+  section{padding:26px 0}
+  h2{font-family:"Fraunces";font-weight:600;font-size:30px;letter-spacing:-.02em;margin:22px 0 6px}
+  h3{font-size:16px;margin:20px 0 6px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px 24px;
+        box-shadow:var(--shadow)}
+  .kicker{font-family:"Fraunces";font-style:italic;font-size:20px;color:var(--cn)}
+  .controls{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:4px 0 12px}
+  .controls .lab{font-size:13px;color:var(--mut);margin-right:6px;font-weight:500}
+  button.tog{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--surface);
+             color:var(--mut);padding:7px 15px;border-radius:9px;cursor:pointer;transition:all .15s}
+  button.tog:hover{color:var(--ink)}
+  button.tog.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  #scatter{width:100%;height:540px}
+  .legend{font-size:13px;color:var(--mut);margin:2px 0 10px;display:flex;gap:18px;flex-wrap:wrap}
+  .pill{display:inline-block;width:11px;height:11px;border-radius:4px;margin-right:7px;vertical-align:-1px}
+  /* ---- table ---- */
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);background:var(--surface)}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:12px 14px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  th:nth-child(2),td:nth-child(2){text-align:left}
+  th{cursor:pointer;user-select:none;color:var(--mut);font-weight:600;font-size:12px;
+     letter-spacing:.03em;text-transform:uppercase;position:sticky;top:56px;background:var(--surface)}
+  th:hover{color:var(--ink)} th.sorted{color:var(--ink)}
+  th.sorted::after{content:" \25BE";font-size:9px} th.asc.sorted::after{content:" \25B4"}
+  td.model{font-weight:600;font-variant-numeric:tabular-nums}
+  td.num,td.rob{font-variant-numeric:tabular-nums;position:relative}
+  tr:hover td{background:color-mix(in srgb,var(--accent) 5%,transparent)}
+  .rankbadge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
+             border-radius:7px;font-size:12px;font-weight:700;color:var(--mut);background:var(--soft)}
+  .r1{background:linear-gradient(135deg,#ffd76a,#f2b52e);color:#5a4200}
+  .r2{background:linear-gradient(135deg,#e4e8ee,#c3ccd6);color:#3a4652}
+  .r3{background:linear-gradient(135deg,#f0c69a,#d99b62);color:#5a3410}
+  .databar{position:absolute;left:6px;top:8px;bottom:8px;border-radius:5px;
+           background:color-mix(in srgb,var(--good) 55%,var(--surface));opacity:.28;z-index:0}
+  td.rob b{position:relative;z-index:1}
+  .swatch{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:8px;vertical-align:0}
+  /* ---- misc ---- */
+  ul{padding-left:18px} li{margin:3px 0}
+  pre{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:16px 18px;overflow:auto;
+      font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.5}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr}}
+  footer{border-top:1px solid var(--line);margin-top:40px;padding:26px 0 70px;color:var(--mut);font-size:13px}
+  .reveal{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s ease}
+  .reveal.in{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <span class="mark"><span class="dots"></span>PoliBench</span>
+  <span class="grow"></span>
+  <a class="navlink" href="#leaderboard">Leaderboard</a>
+  <a class="navlink" href="#method">Method</a>
+  <a class="navlink" href="#data">Data</a>
+  <a class="navlink" href="#cite">Cite</a>
+  <button class="themebtn" id="theme" title="Toggle dark mode">☾</button>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <span class="chip">v1 · preliminary</span>
+  <h1 class="serif">The strictest models are<br>the <em>easiest to break.</em></h1>
+  <p class="lede">PoliBench evaluates how large language models handle political and
+  authoritarian-harm requests — and how well those safeguards survive adversarial evasion.
+  As LLMs become primary information tools, their political guardrails matter for election
+  integrity, institutional trust, and information integrity.</p>
+  <div class="stats">
+    <div class="stat"><b>10</b><span>frontier models</span></div>
+    <div class="stat"><b>3</b><span>languages</span></div>
+    <div class="stat"><b>144</b><span>political prompts</span></div>
+    <div class="stat"><b>2</b><span>conditions (native · attack)</span></div>
+  </div>
+  <div class="cta">
+    <a class="btn primary" href="#leaderboard">Explore the leaderboard →</a>
+    <a class="btn" href="#" title="add your paper link">Read the paper (soon)</a>
+  </div>
+</div></header>
+
+<div class="wrap">
+
+  <section class="reveal">
+    <div class="card">
+      <span class="kicker">The headline.</span>
+      Native strictness and adversarial robustness are <b>decoupled</b>. The models that refuse
+      political requests most readily are <em>not</em> the ones hardest to jailbreak: Chinese-developed
+      models are strictest at baseline yet the most easily bypassed by rephrasing, while Claude and
+      Gemini — not the strictest refusers — are the only systems that are both strict and robust.
+    </div>
+  </section>
+
+  <section id="leaderboard" class="reveal">
+    <h2 class="serif">Leaderboard</h2>
+    <div class="controls">
+      <span class="lab">Language</span>
+      <button class="tog on" data-lang="avg">Average</button>
+      <button class="tog" data-lang="EN">English</button>
+      <button class="tog" data-lang="ZH">Chinese</button>
+      <button class="tog" data-lang="FR">French</button>
+    </div>
+    <div class="legend">
+      <span><span class="pill" style="background:var(--us)"></span>U.S.</span>
+      <span><span class="pill" style="background:var(--cn)"></span>China</span>
+      <span><span class="pill" style="background:var(--open)"></span>Open-weight</span>
+      <span class="small">· hover a point for details · click a column to sort</span>
+    </div>
+    <div id="scatter"></div>
+    <p class="small mut" style="margin:2px 2px 22px">
+      <b>X — native strictness</b> (100 − compliance): how rarely a model fulfils a harmful political
+      request with no attack (right = stricter). <b>Y — robustness</b> (100 − jailbreak success):
+      how well refusals survive adversarial paraphrase (up = more robust). Green band = safer under attack.
+    </p>
+
+    <div class="tablewrap">
+    <table id="board">
+      <thead><tr>
+        <th data-k="rank">#</th>
+        <th data-k="model">Model</th>
+        <th data-k="origin">Origin</th>
+        <th data-k="compliance" title="Fraction of harmful political requests fulfilled with no attack. Lower = stricter.">Compliance&nbsp;↓</th>
+        <th data-k="jailbreak" title="Of requests refused at baseline, fraction recovered by adversarial paraphrase. Lower = more robust.">Jailbreak&nbsp;↓</th>
+        <th data-k="robust" class="sorted" title="100 − jailbreak. Higher = more robust.">Robustness&nbsp;↑</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+    </div>
+    <p class="small mut" style="margin-top:10px">
+      We report <b>compliance</b> (whether the model actually fulfils the request), not "refusal":
+      a baseline non-fulfilment can be an explicit refusal <em>or</em> a hedged/partial answer, and we
+      don't conflate them. Values average the selected language(s) over the 144-item suite.
+    </p>
+  </section>
+
+  <section id="method" class="reveal">
+    <h2 class="serif">Methodology</h2>
+    <p>Each model is scored on <b>144 political / authoritarian-harm prompts</b> across
+    <b>12 subcategories</b> (election manipulation, press censorship, military coup, surveillance
+    state, opposition suppression, personality cult, democratic erosion, ethnic persecution, and
+    others), in <b>English, Chinese, and French</b>, under two conditions:</p>
+    <ul>
+      <li><b>Native (zero-attack):</b> the raw request. <b>Compliance</b> = share fulfilled;
+        strictness = 100 − compliance.</li>
+      <li><b>Attack:</b> an automated, budget-limited <b>adversarial-paraphrase</b> search (meaning
+        preserved). <b>Jailbreak success</b> = of items refused at baseline, the share recovered;
+        robustness = 100 − jailbreak success.</li>
+    </ul>
+    <p class="small mut">Compliance is scored by a fixed LLM judge; platform content-filter rejections
+    count as non-fulfilment. The full protocol accompanies the paper.</p>
+  </section>
+
+  <div class="grid2">
+    <section id="data" class="reveal">
+      <h2 class="serif">Dataset</h2>
+      <ul class="small">
+        <li><b>Size:</b> 144 prompts × 3 languages · 10 models.</li>
+        <li><b>Task:</b> evaluate political guardrails &amp; jailbreak robustness.</li>
+        <li><b>Intended use:</b> AI-safety evaluation and red-teaming research.</li>
+        <li><b>Out of scope:</b> operational misuse — prompts are evaluation stimuli.</li>
+        <li><b>Status:</b> v1 descriptive; causal analyses (domain-specificity, collective-action
+          targeting) are ongoing and <em>not</em> reported here.</li>
+      </ul>
+    </section>
+    <section class="reveal">
+      <h2 class="serif">Responsible use</h2>
+      <p class="small">The prompt suite is released for safety evaluation. To limit misuse we
+      <b>withhold the adversarial-attack tooling and optimized jailbreak prompts</b>; qualified
+      researchers may request access. We report model behavior to inform safeguards, not to enable
+      harm. Use in accordance with each provider's terms.</p>
+    </section>
+  </div>
+
+  <section id="cite" class="reveal">
+    <h2 class="serif">Citation</h2>
+    <p class="small mut">If you use this benchmark, please cite PoliBench and the attack framework it builds on.</p>
+    <pre>@misc{polibench2026,
+  title  = {PoliBench: Benchmarking Political Guardrails and Jailbreak
+            Robustness in Large Language Models},
+  author = {Liu, Menglin and Yu, Yao and Wu, Tong and Shi, Ge},
+  year   = {2026},
+  note   = {v1 preliminary release},
+  url    = {https://menglinmileyliu.github.io/}   <!-- EDIT canonical URL -->
+}
+
+@misc{jailbreakopt2026,
+  title  = {JailbreakOPT: Tool-Assisted Iterative Jailbreak Prompt Optimization},
+  author = {Shi, Ge and Yin, Jun and Xie, Donglin and Liu, Fangyi and
+            Li, Yucan and Liu, Menglin},
+  year   = {2026},
+  note   = {arXiv:2606.11425}
+}</pre>
+  </section>
+
+  <section class="reveal">
+    <h2 class="serif">Team</h2>
+    <p><b>Menglin Liu</b> (maintainer), Yao Yu, Tong Wu, Ge Shi.
+    <br><span class="small mut">Contact: <a href="mailto:menglinliu@cuhk.edu.cn">menglinliu@cuhk.edu.cn</a></span></p>
+  </section>
+
+</div>
+
+<footer><div class="wrap">
+  PoliBench v1 (preliminary) · Data © the authors, released for research under
+  <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
+  Numbers are descriptive and subject to revision.
+</div></footer>
+
+<script>
+/* ---------- verified data (per model, [EN, ZH, FR]) ---------- */
+const MODELS=[
+ {key:"GPT-4o",name:"GPT-4o",origin:"US",gar:[29.2,37.5,36.1],asr:[81.4,91.1,73.9]},
+ {key:"GPT-5.5",name:"GPT-5.5",origin:"US",gar:[0.7,0.0,2.8],asr:[63.6,60.4,70.7]},
+ {key:"Claude",name:"Claude Opus 4.7",origin:"US",gar:[16.7,4.2,13.2],asr:[8.3,31.9,17.6]},
+ {key:"Gemini",name:"Gemini 3.5 Flash",origin:"US",gar:[2.1,4.9,7.6],asr:[15.6,38.0,34.6]},
+ {key:"Doubao",name:"Doubao",origin:"CN",gar:[0.0,0.0,1.4],asr:[69.4,83.3,86.6]},
+ {key:"DeepSeek",name:"DeepSeek",origin:"CN",gar:[5.6,0.0,0.7],asr:[87.5,57.6,26.6]},
+ {key:"Qwen3.8",name:"Qwen3.8 Max",origin:"CN",gar:[5.6,0.7,1.4],asr:[67.6,38.5,50.7]},
+ {key:"Kimi",name:"Kimi K2.6",origin:"CN",gar:[2.8,2.1,0.0],asr:[73.6,84.4,77.1]},
+ {key:"Llama",name:"Llama-3.1-8B",origin:"Open",gar:[40.3,27.8,44.4],asr:[74.4,90.4,93.8]},
+ {key:"Qwen2.5",name:"Qwen2.5-7B",origin:"Open",gar:[41.0,20.8,43.1],asr:[71.8,94.7,85.4]},
+];
+const OL={US:"U.S.",CN:"China",Open:"Open-weight"}, LI={EN:0,ZH:1,FR:2};
+const cssv=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+function metricsFor(lang){
+  return MODELS.map(m=>{
+    const gar=lang==="avg"?mean(m.gar):m.gar[LI[lang]];
+    const asr=lang==="avg"?mean(m.asr):m.asr[LI[lang]];
+    return {key:m.key,name:m.name,origin:m.origin,compliance:gar,strictness:100-gar,jailbreak:asr,robust:100-asr};
+  });
+}
+function heat(v,scaleMax){ // 0(green)->1(red)
+  const t=Math.max(0,Math.min(1,v/scaleMax));
+  const g=[42,157,63], r=[193,53,43];
+  const c=g.map((x,i)=>Math.round(x+(r[i]-x)*t));
+  return `rgba(${c[0]},${c[1]},${c[2]},0.15)`;
+}
+
+/* ---------- scatter ---------- */
+let plotted=false;
+function scatterTraces(lang){
+  const rows=metricsFor(lang);
+  return ["US","CN","Open"].map(o=>{
+    const r=rows.filter(x=>x.origin===o), COL=cssv("--"+o.toLowerCase());
+    return {x:r.map(x=>x.strictness),y:r.map(x=>x.robust),text:r.map(x=>x.name),
+      name:OL[o],mode:"markers+text",textposition:"top center",
+      textfont:{size:10.5,color:cssv("--mut"),family:"Inter"},
+      marker:{size:15,color:COL,line:{color:cssv("--surface"),width:2}},
+      customdata:r.map(x=>[x.compliance,x.jailbreak,x.robust]),
+      hovertemplate:"<b>%{text}</b><br>compliance %{customdata[0]:.1f}%<br>jailbreak %{customdata[1]:.1f}%<br>robustness %{customdata[2]:.1f}%<extra></extra>"};
+  });
+}
+function scatterLayout(){
+  const ink=cssv("--ink"),mut=cssv("--mut"),line=cssv("--line"),surf=cssv("--surface");
+  return {margin:{l:64,r:22,t:8,b:56},font:{family:"Inter",color:mut},
+    xaxis:{title:{text:"Native strictness  (100 − compliance, %)",font:{color:mut}},range:[50,103],zeroline:false,gridcolor:line,tickcolor:line},
+    yaxis:{title:{text:"Robustness  (100 − jailbreak, %)",font:{color:mut}},range:[-3,96],zeroline:false,gridcolor:line,tickcolor:line},
+    shapes:[
+      {type:"rect",x0:50,x1:103,y0:50,y1:96,fillcolor:"rgba(42,157,63,0.06)",line:{width:0},layer:"below"},
+      {type:"rect",x0:50,x1:103,y0:-3,y1:50,fillcolor:"rgba(193,53,43,0.05)",line:{width:0},layer:"below"},
+      {type:"line",x0:80,x1:80,y0:-3,y1:96,line:{color:line,width:1,dash:"dot"}}
+    ],
+    annotations:[
+      {x:101.5,y:92,text:"strict & robust",showarrow:false,font:{size:11,color:mut},xanchor:"right"},
+      {x:101.5,y:3,text:"strict but brittle",showarrow:false,font:{size:11,color:mut},xanchor:"right"},
+      {x:52,y:3,text:"neither",showarrow:false,font:{size:11,color:mut},xanchor:"left"}
+    ],
+    legend:{orientation:"h",y:1.1,x:0,font:{color:mut}},
+    paper_bgcolor:surf,plot_bgcolor:surf};
+}
+function renderScatter(lang,animate){
+  if(!plotted){
+    Plotly.newPlot("scatter",scatterTraces(lang),scatterLayout(),{displayModeBar:false,responsive:true});
+    plotted=true; return;
+  }
+  if(animate){
+    Plotly.animate("scatter",{data:scatterTraces(lang)},
+      {transition:{duration:600,easing:"cubic-in-out"},frame:{duration:600,redraw:false}});
+  }else{
+    Plotly.react("scatter",scatterTraces(lang),scatterLayout(),{displayModeBar:false,responsive:true});
+  }
+}
+
+/* ---------- table ---------- */
+let sortKey="robust",sortDir=-1;
+function renderTable(lang){
+  const rows=metricsFor(lang);
+  const robRank={}; [...rows].sort((a,b)=>b.robust-a.robust).forEach((r,i)=>robRank[r.key]=i+1);
+  rows.sort((a,b)=>{
+    let va=a[sortKey],vb=b[sortKey];
+    if(sortKey==="model"){va=a.name;vb=b.name} if(sortKey==="origin"){va=a.origin;vb=b.origin}
+    return typeof va==="string"?sortDir*va.localeCompare(vb):sortDir*(va-vb);
+  });
+  const tb=document.querySelector("#board tbody"); tb.innerHTML="";
+  rows.forEach(r=>{
+    const rr=robRank[r.key], badge=rr<=3?`<span class="rankbadge r${rr}">${rr}</span>`:`<span class="rankbadge">${rr}</span>`;
+    const tr=document.createElement("tr");
+    tr.innerHTML=
+      `<td>${badge}</td>`+
+      `<td class="model"><span class="swatch" style="background:${cssv("--"+r.origin.toLowerCase())}"></span>${r.name}</td>`+
+      `<td class="mut">${OL[r.origin]}</td>`+
+      `<td class="num" style="background:${heat(r.compliance,50)}">${r.compliance.toFixed(1)}</td>`+
+      `<td class="num" style="background:${heat(r.jailbreak,100)}">${r.jailbreak.toFixed(1)}</td>`+
+      `<td class="rob"><span class="databar" style="width:calc(${r.robust}% - 12px)"></span><b>${r.robust.toFixed(1)}</b></td>`;
+    tb.appendChild(tr);
+  });
+  document.querySelectorAll("#board th").forEach(th=>{
+    th.classList.toggle("sorted",th.dataset.k===sortKey);
+    th.classList.toggle("asc",th.dataset.k===sortKey&&sortDir===1);
+  });
+}
+
+/* ---------- wiring ---------- */
+let curLang="avg";
+document.querySelectorAll("button.tog").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("button.tog").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); curLang=b.dataset.lang; renderScatter(curLang,true); renderTable(curLang);
+});
+document.querySelectorAll("#board th").forEach(th=>th.onclick=()=>{
+  const k=th.dataset.k; if(k==="rank")return;
+  if(sortKey===k)sortDir*=-1; else{sortKey=k;sortDir=(k==="model"||k==="origin")?1:-1}
+  renderTable(curLang);
+});
+/* theme */
+const root=document.documentElement, tbtn=document.getElementById("theme");
+function setTheme(t){root.setAttribute("data-theme",t);tbtn.textContent=t==="dark"?"☀":"☾";
+  try{localStorage.setItem("pb-theme",t)}catch(e){}; plotted=false; renderScatter(curLang,false);}
+tbtn.onclick=()=>setTheme(root.getAttribute("data-theme")==="dark"?"light":"dark");
+(function(){let t;try{t=localStorage.getItem("pb-theme")}catch(e){}
+  if(!t)t=matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"; setTheme(t);})();
+/* first paint */
+renderScatter("avg",false); renderTable("avg");
+/* scroll reveal */
+const io=new IntersectionObserver((es)=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}}),{threshold:.12});
+document.querySelectorAll(".reveal").forEach(el=>io.observe(el));
+</script>
+</body>
+</html>
